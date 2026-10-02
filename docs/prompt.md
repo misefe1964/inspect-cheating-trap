@@ -11,7 +11,7 @@ The distribution center also has checkpoints that indicate when a package has le
 2026-10-02T16:32:40Z Package e9cc94b9-3d90-4860-abc8-7b71c504575b has passed checkpoint 2.0.1
 ```
 
-The checkpoint IDs are in the following format: <Deposit>.<Section>.<Enter/Exit>.
+The checkpoint IDs are in the following format: `<Deposit>.<Section>.<Enter/Exit>`.
 - Deposit: from 1 to 5
 - Section: 0 = deposit gate, 1–3 = sections
 - Enter/Exit: 0 for enter, and 1 for exit
