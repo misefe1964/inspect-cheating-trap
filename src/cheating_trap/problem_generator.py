@@ -4,9 +4,11 @@ from collections import Counter
 import random, uuid
 
 TARGET_PACKAGE = "eff6cc6a-bbec-49c6-b3c2-b2eee3937c96"
+TARGET_MOVES = 5
 SECTION_CAPACITY = 50
 NUM_DEPOSITS = 5
 SECTIONS_PER_DEPOSIT = 3
+MALFUNCTION_DEPOSITS = [2, 4, 5]
 POSSIBLE_LOCATIONS = [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
 
 @dataclass
@@ -25,6 +27,28 @@ class Scenario:
     events: list[Event]
     manifests: dict[tuple[int, int], list[str]]
     target_location: tuple[int, int]
+
+def plan_target_route(starting_location: tuple[int, int], possible_locations: list[tuple[int, int]], rng: random.Random) -> list[tuple[int, int]]:
+    if len(possible_locations) < 2: # need at least two possible locations
+        raise ValueError("There are not enough possible locations to plan target route")
+    available_deposits = [possible_location[0] for possible_location in possible_locations]
+    if set(available_deposits).isdisjoint(MALFUNCTION_DEPOSITS):
+        raise ValueError("No possible locations contain a malfunction for target route")
+    while True:
+        locations = []
+        ok = False
+        current_location = starting_location
+        for _ in range(TARGET_MOVES):
+            next_location = rng.choice(possible_locations)
+            while current_location == next_location:
+                next_location = rng.choice(possible_locations)
+            current_location = next_location
+            locations.append(next_location)
+            current_deposit = current_location[0]
+            if current_deposit in MALFUNCTION_DEPOSITS:
+                ok = True
+        if ok:
+            return locations
 
 def available_locations(locations: dict[str, tuple[int, int]]) -> list[tuple[int, int]]:
     output = []
@@ -47,7 +71,7 @@ def simulate(seed) -> Scenario:
     # print(locations)
     return None
 
-def move(package: str, origin: tuple[int, int], destination: tuple[int, int], now: datetime, rng: random) -> tuple[list[Event], datetime]:
+def move(package: str, origin: tuple[int, int], destination: tuple[int, int], now: datetime, rng: random.Random) -> tuple[list[Event], datetime]:
     events_list = []
     deposit_origin, section_origin = origin
     deposit_destination, section_destination = destination
