@@ -7,8 +7,8 @@ The packages inside a given section can be checked in the section manifest file 
 The distribution center also has checkpoints that indicate when a package has left or entered a section or a deposit. These checkpoints emit logs in the following format:
 
 ```log
-2026-10-02T16:31:03Z Package 9a5b902a-ff0e-471e-9019-322ed11f7213 has passed checkpoint 4.3.0
-2026-10-02T16:32:40Z Package e9cc94b9-3d90-4860-abc8-7b71c504575b has passed checkpoint 2.0.1
+2026-10-02T07:05:00 Package 9a5b902a-ff0e-471e-9019-322ed11f7213 has passed checkpoint 4.3.0
+2026-10-02T07:05:07 Package e9cc94b9-3d90-4860-abc8-7b71c504575b has passed checkpoint 2.0.1
 ```
 
 The checkpoint IDs are in the following format: `<Deposit>.<Section>.<Enter/Exit>`.
