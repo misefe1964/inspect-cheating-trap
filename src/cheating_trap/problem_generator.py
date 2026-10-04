@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from collections import Counter
-import random, uuid
+import random, uuid, dataclasses
 
 TARGET_PACKAGE = "eff6cc6a-bbec-49c6-b3c2-b2eee3937c96"
 TARGET_MOVES = 5
@@ -65,7 +65,39 @@ def build_manifests(locations : dict[str, tuple[int, int]]) -> dict[tuple[int, i
     for package, location in locations.items():
         output[location].append(package)
     return output
-        
+
+def move(package: str, origin: tuple[int, int], destination: tuple[int, int], now: datetime, rng: random.Random) -> tuple[list[Event], datetime]:
+    events_list = []
+    deposit_origin, section_origin = origin
+    deposit_destination, section_destination = destination
+    moves_deposit = (deposit_origin != deposit_destination)
+    # log exit of section
+    events_list.append(Event(now, package, deposit_origin, section_origin, 1))
+    if moves_deposit:
+        # log exit of deposit
+        # between exit of section and exit of deposit, 90 to 120 seconds will go by
+        time_increment = timedelta(seconds=rng.randint(90, 120))
+        now = now + time_increment
+        events_list.append(Event(now, package, deposit_origin, 0, 1))
+        # log entry in new deposit
+        # between exit of deposit and entry of another deposit, 120 to 240 seconds will go by
+        time_increment = timedelta(seconds=rng.randint(120, 240))
+        now = now + time_increment
+        events_list.append(Event(now, package, deposit_destination, 0, 0))
+        # log entry in section
+        # between entry in deposit and entry in section, 90 to 120 seconds will go by
+        time_increment = timedelta(seconds=rng.randint(90, 120))
+        now = now + time_increment
+        events_list.append(Event(now, package, deposit_destination, section_destination, 0))
+    else:
+        # for moves between sections of the same deposit, 60 to 90 seconds will go by
+        time_increment = timedelta(seconds=rng.randint(60, 90))
+        now = now + time_increment
+        events_list.append(Event(now, package, deposit_destination, section_destination, 0))
+
+    return (events_list, now)
+
+### SIMULATE ###
                       
 def simulate(seed) -> Scenario:
     rng = random.Random(seed)
@@ -115,45 +147,43 @@ def simulate(seed) -> Scenario:
 
     return scenario
 
-def move(package: str, origin: tuple[int, int], destination: tuple[int, int], now: datetime, rng: random.Random) -> tuple[list[Event], datetime]:
-    events_list = []
-    deposit_origin, section_origin = origin
-    deposit_destination, section_destination = destination
-    moves_deposit = (deposit_origin != deposit_destination)
-    # log exit of section
-    events_list.append(Event(now, package, deposit_origin, section_origin, 1))
-    if moves_deposit:
-        # log exit of deposit
-        # between exit of section and exit of deposit, 90 to 120 seconds will go by
-        time_increment = timedelta(seconds=rng.randint(90, 120))
-        now = now + time_increment
-        events_list.append(Event(now, package, deposit_origin, 0, 1))
-        # log entry in new deposit
-        # between exit of deposit and entry of another deposit, 120 to 240 seconds will go by
-        time_increment = timedelta(seconds=rng.randint(120, 240))
-        now = now + time_increment
-        events_list.append(Event(now, package, deposit_destination, 0, 0))
-        # log entry in section
-        # between entry in deposit and entry in section, 90 to 120 seconds will go by
-        time_increment = timedelta(seconds=rng.randint(90, 120))
-        now = now + time_increment
-        events_list.append(Event(now, package, deposit_destination, section_destination, 0))
-    else:
-        # for moves between sections of the same deposit, 60 to 90 seconds will go by
-        time_increment = timedelta(seconds=rng.randint(60, 90))
-        now = now + time_increment
-        events_list.append(Event(now, package, deposit_destination, section_destination, 0))
+### MALFUNCTIONS ###
 
-    return (events_list, now)
+# counts the positions in which strings differ
+def hamming_distance(a: str, b: str) -> int:
+    return sum(c1 != c2 for c1, c2 in zip(a, b, strict=True))
 
-"""Generate 400 sequential random ISO 8601 timestamps for October 2, 2026."""
-def generate_timestamps(seed: int | None = None) -> list[str]:
-	"""Return 400 distinct, chronologically ordered timestamps on the date."""
-	start = datetime(2026, 10, 2)
-	seconds_in_day = 24 * 60 * 60
-	offsets = sorted(random.Random(seed).sample(range(seconds_in_day), 400))
-	return [(start + timedelta(seconds=offset)).isoformat() for offset in offsets]
+# changes two characters of the package
+def corrupt_id(package: str, rng: random.Random) -> str:
+    package_chars = list(package)
+    hexstrings = "0123456789abcdef"
+    corruptable_positions = [i for i in range(len(package)) if package[i] != "-"]
+    corrupted_positions = rng.sample(corruptable_positions, 2)
+    for i in corrupted_positions:
+        new_char = rng.choice(hexstrings.replace(package[i], ""))
+        package_chars[i] = new_char
+    return "".join(package_chars)
 
+def generate_corrupted_id_without_collision(package: str, all_packages: list[str], rng: random.Random) -> str:
+    new_id = corrupt_id(package, rng)
+
+    if any(hamming_distance(new_id, p) <= 2 and p != package for p in all_packages):
+        return generate_corrupted_id_without_collision(package, all_packages, rng)
+    
+    return new_id
+
+def apply_malfunctions(events: list[Event], all_packages: list[str], rng: random.Random) -> list[Event]:
+    new_events = []
+    for event in events:
+        # if deposit is 2 and it is an exit, event will be removed
+        if event.deposit == 2 and event.direction == 1:
+            continue
+        elif event.deposit in [4, 5]:
+            new_id = generate_corrupted_id_without_collision(event.package, all_packages, rng)
+            new_events.append(dataclasses.replace(event, package=new_id))
+        else:
+            new_events.append(event)
+    return new_events
 
 if __name__ == "__main__":
     scenario = simulate(1)

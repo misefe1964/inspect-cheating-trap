@@ -1,7 +1,6 @@
-from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE
+from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE
 from datetime import datetime
-import random
-import pytest
+import random, pytest, uuid
 
 def test_available_locations_all_available():
     assert available_locations({}) == [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
@@ -79,3 +78,44 @@ def test_simulate_target_location():
         assert last_event.direction == 0
         assert last_event.section != 0
         assert TARGET_PACKAGE in scenario.manifests[scenario.target_location]
+
+def test_hamming_distance():
+    assert hamming_distance("abc", "abc") == 0
+    assert hamming_distance("aaa", "abc") == 2
+    with pytest.raises(ValueError):
+        hamming_distance("a", "ab")
+
+def test_corrupt_id():
+    for seed in range(1000):
+        rng = random.Random(seed)
+        package = str(uuid.UUID(int=rng.getrandbits(128), version=4))
+        result = corrupt_id(package, rng)
+        assert len(result) == len(package)
+        assert hamming_distance(result, package) == 2
+        assert [len(s) for s in package.split("-")] == [len(s) for s in result.split("-")]
+
+def test_apply_malfunctions():
+    seed = 1
+    rng = random.Random(seed)
+    scenario = simulate(seed)
+    events = scenario.events
+    original = list(events)
+    deposit_2_exits = sum(1 for e in events if e.deposit == 2 and e.direction == 1)
+    other_events = []
+    for event in events:
+        if event.deposit not in [4, 5] and not (event.deposit == 2 and event.direction == 1):
+            other_events.append(event)
+    old_4_5_events = [event for event in events if event.deposit in [4, 5]]
+    all_packages = [p for section_packages in scenario.manifests.values() for p in section_packages]
+    new_events = apply_malfunctions(events, all_packages, rng)
+    new_4_5_events = [event for event in new_events if event.deposit in [4, 5]]
+    for untouched_event in other_events:
+        assert untouched_event in new_events
+    assert original == events
+    assert len(events) == len(new_events) + deposit_2_exits
+    assert len(new_4_5_events) == len(old_4_5_events)
+    for i in range(len(new_4_5_events)):
+        assert hamming_distance(new_4_5_events[i].package, old_4_5_events[i].package) == 2
+    for nv in new_events:
+        if nv.direction == 1:
+            assert nv.deposit != 2
