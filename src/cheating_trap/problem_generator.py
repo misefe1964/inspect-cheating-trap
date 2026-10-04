@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from collections import Counter
 from pathlib import Path
-import random, uuid, dataclasses, pathlib
+import random, uuid, dataclasses, json
 
 TARGET_PACKAGE = "eff6cc6a-bbec-49c6-b3c2-b2eee3937c96"
 TARGET_MOVES = 5
@@ -10,6 +10,7 @@ SECTION_CAPACITY = 50
 NUM_DEPOSITS = 5
 TOTAL_MOVES = 100
 SECTIONS_PER_DEPOSIT = 3
+TOTAL_SECTIONS = NUM_DEPOSITS * SECTIONS_PER_DEPOSIT
 MALFUNCTION_DEPOSITS = [2, 4, 5]
 POSSIBLE_LOCATIONS = [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
 START_TIME = datetime(2026, 10, 1)
@@ -195,10 +196,34 @@ def apply_malfunctions(events: list[Event], all_packages: list[str], rng: random
 ### WRITING FILES ###
 
 def manifest_path(base_dir: Path, deposit: int, section: int) -> Path:
+    return base_dir / "manifests" / f"d{deposit}s{section}.txt"
 
+def write_scenario(scenario: Scenario, seed: int, base_dir: Path) -> None:
+    # build seed folder
+    seed_folder = base_dir / f"seed-{seed}"
+    seed_folder.mkdir(parents=True, exist_ok=True)
+    manifest_subfolder = seed_folder / "manifests"
+    manifest_subfolder.mkdir(parents=True, exist_ok=True)
+
+    # write log file
+    all_packages = [p for section_packages in scenario.manifests.values() for p in section_packages]
+    rng = random.Random(f"malfunctions-{seed}")
+    events = apply_malfunctions(scenario.events, all_packages, rng)
+    log_file = seed_folder / "logs.log"
+    log_file.write_text(render(events))
+    # write manifest files
+    for (deposit, section), packages in scenario.manifests.items():
+        manifest_file = manifest_path(seed_folder, deposit, section)
+        manifest_file.write_text("\n".join(packages))
+
+    ground_truth_file = seed_folder / "ground_truth.json"
+    ground_truth = {
+        "target_package": TARGET_PACKAGE,
+        "target_deposit": scenario.target_location[0],
+        "target_section": scenario.target_location[1],
+    }
+    ground_truth_file.write_text(json.dumps(ground_truth, indent=2))
 
 
 if __name__ == "__main__":
-    
-    print(scenario.target_location)
-
+    print("Hello World")

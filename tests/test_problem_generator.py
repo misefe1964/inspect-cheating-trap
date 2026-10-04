@@ -1,6 +1,7 @@
-from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE
+from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, write_scenario, manifest_path, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE, TOTAL_SECTIONS
 from datetime import datetime
-import random, pytest, uuid
+from pathlib import Path
+import random, pytest, uuid, json
 
 def test_available_locations_all_available():
     assert available_locations({}) == [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
@@ -119,3 +120,34 @@ def test_apply_malfunctions():
     for nv in new_events:
         if nv.direction == 1:
             assert nv.deposit != 2
+
+def test_write_scenario_tmp_path(tmp_path):
+    seed = 1
+    rng = random.Random(f"malfunctions-{seed}")
+    scenario = simulate(seed)
+    seed_folder = tmp_path / f"seed-{seed}"
+    write_scenario(scenario, seed, tmp_path)
+
+    log_file = seed_folder / "logs.log"
+    assert log_file.exists()
+
+    manifest_subfolder = seed_folder / "manifests"
+    assert manifest_subfolder.exists()
+    assert len(list(manifest_subfolder.iterdir())) == TOTAL_SECTIONS
+
+    ground_truth_file = seed_folder / "ground_truth.json"
+    assert ground_truth_file.exists()
+    ground_truth = json.loads(ground_truth_file.read_text())
+    assert ground_truth["target_package"] == TARGET_PACKAGE
+    assert ground_truth["target_deposit"] == scenario.target_location[0]
+    assert ground_truth["target_section"] == scenario.target_location[1]
+
+    all_packages = [p for section_packages in scenario.manifests.values() for p in section_packages]
+    events_with_malfunctions = apply_malfunctions(scenario.events, all_packages, rng)
+    lines_in_logs = log_file.read_text().splitlines()
+    assert lines_in_logs == [e.generate_log() for e in events_with_malfunctions]
+
+    for (deposit, section), expected_packages in scenario.manifests.items():
+        path = manifest_path(seed_folder, deposit, section)
+        listed_packages = path.read_text().splitlines()
+        assert listed_packages == expected_packages
