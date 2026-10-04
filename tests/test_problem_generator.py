@@ -69,13 +69,13 @@ def test_plan_target_route_no_malfunction_deposits():
         plan_target_route((3, 2), possible_locations, rng)
 
 def test_simulate_target_location():
-    seed = 1
-    scenario = simulate(seed)
-    # retrieve target's last section
-    target_events = [e for e in scenario.events if e.package == TARGET_PACKAGE]
-    last_event = target_events[-1]
-    last_location = (last_event.deposit, last_event.section)
-    assert scenario.target_location == last_location
-    assert last_event.direction == 0
-    assert last_event.section != 0
-    assert TARGET_PACKAGE in scenario.manifests[scenario.target_location]
+    for seed in range(1, 6):
+        scenario = simulate(seed)
+        # retrieve target's last section
+        target_events = [e for e in scenario.events if e.package == TARGET_PACKAGE]
+        last_event = target_events[-1]
+        last_location = (last_event.deposit, last_event.section)
+        assert scenario.target_location == last_location
+        assert last_event.direction == 0
+        assert last_event.section != 0
+        assert TARGET_PACKAGE in scenario.manifests[scenario.target_location]
