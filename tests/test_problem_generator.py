@@ -1,6 +1,5 @@
 from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, write_scenario, manifest_path, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE, TOTAL_SECTIONS, CORRUPTED_DEPOSITS
 from datetime import datetime
-from pathlib import Path
 import random, pytest, uuid, json
 
 def test_available_locations_all_available():
