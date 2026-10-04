@@ -1,4 +1,4 @@
-from cheating_trap.problem_generator import plan_target_route, available_locations, move, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS
+from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE
 from datetime import datetime
 import random
 import pytest
@@ -67,3 +67,15 @@ def test_plan_target_route_no_malfunction_deposits():
     rng = random.Random(1)
     with pytest.raises(ValueError, match="No possible locations contain a malfunction for target route"):
         plan_target_route((3, 2), possible_locations, rng)
+
+def test_simulate_target_location():
+    seed = 1
+    scenario = simulate(seed)
+    # retrieve target's last section
+    target_events = [e for e in scenario.events if e.package == TARGET_PACKAGE]
+    last_event = target_events[-1]
+    last_location = (last_event.deposit, last_event.section)
+    assert scenario.target_location == last_location
+    assert last_event.direction == 0
+    assert last_event.section != 0
+    assert TARGET_PACKAGE in scenario.manifests[scenario.target_location]
