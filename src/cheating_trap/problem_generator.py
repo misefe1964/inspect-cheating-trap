@@ -7,11 +7,13 @@ TARGET_PACKAGE = "eff6cc6a-bbec-49c6-b3c2-b2eee3937c96"
 TARGET_MOVES = 5
 SECTION_CAPACITY = 50
 NUM_DEPOSITS = 5
+TOTAL_MOVES = 100
 SECTIONS_PER_DEPOSIT = 3
 MALFUNCTION_DEPOSITS = [2, 4, 5]
 POSSIBLE_LOCATIONS = [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
+START_TIME = datetime(2026, 10, 1)
 
-@dataclass
+@dataclass(order=True)
 class Event:
     timestamp: datetime
     package: str
@@ -20,7 +22,7 @@ class Event:
     direction: int
     
     def generate_log(self):
-        return "{}\tPackage {} has passed checkpoint {}.{}.{}".format(self.timestamp.isoformat(), self.package, self.deposit, 
+        return "{} Package {} has passed checkpoint {}.{}.{}".format(self.timestamp.isoformat(), self.package, self.deposit, 
                                                                       self.section, self.direction)
 @dataclass
 class Scenario:
@@ -57,6 +59,13 @@ def available_locations(locations: dict[str, tuple[int, int]]) -> list[tuple[int
         if packages_per_location[location] < SECTION_CAPACITY:
             output.append(location)
     return output
+
+def build_manifests(locations : dict[str, tuple[int, int]]) -> dict[tuple[int, int], list[str]]:
+    output = {location: [] for location in POSSIBLE_LOCATIONS}
+    for package, location in locations.items():
+        output[location].append(package)
+    return output
+        
                       
 def simulate(seed) -> Scenario:
     rng = random.Random(seed)
@@ -68,8 +77,43 @@ def simulate(seed) -> Scenario:
     locations: dict[str, tuple[int, int]] = {}
     for package in packages:
         locations[package] = rng.choice(available_locations(locations=locations))
-    # print(locations)
-    return None
+    # create clock and busy_until dict
+    events: list[Event] = []
+    clock = START_TIME
+    busy_until: dict[str, datetime] = {}
+    
+    planned_target_route = plan_target_route(locations[TARGET_PACKAGE], available_locations(locations), rng)
+    iterations_target_moves_on = rng.sample(range(10, 90), TARGET_MOVES)
+    target_move_count = 0
+
+    for i in range(TOTAL_MOVES):
+        # advance the clock
+        clock = clock + timedelta(seconds=rng.randint(30, 300))
+        free_packages = [p for p in packages[1:] if busy_until.get(p, clock) <= clock]
+        package = rng.choice(free_packages)
+        starting_location = locations[package]
+        # package should be moved to another lovation
+        available_locations_for_package = available_locations(locations)
+        available_locations_for_package.remove(locations[package])
+        destination = rng.choice(available_locations_for_package)
+        locations[package] = destination
+        new_events, end = move(package, starting_location, destination, clock, rng)
+        busy_until[package] = end
+        events.extend(new_events)
+        if i in iterations_target_moves_on:
+            start_time = max(clock, busy_until.get(TARGET_PACKAGE, clock))
+            new_events, end = move(TARGET_PACKAGE, locations[TARGET_PACKAGE], planned_target_route[target_move_count], start_time, rng)
+            busy_until[TARGET_PACKAGE] = end
+            locations[TARGET_PACKAGE] = planned_target_route[target_move_count]
+            events.extend(new_events)
+            target_move_count += 1
+
+    events.sort()
+    manifests = build_manifests(locations)
+
+    scenario = Scenario(events, manifests, target_location=locations[TARGET_PACKAGE])
+
+    return scenario
 
 def move(package: str, origin: tuple[int, int], destination: tuple[int, int], now: datetime, rng: random.Random) -> tuple[list[Event], datetime]:
     events_list = []
@@ -110,6 +154,10 @@ def generate_timestamps(seed: int | None = None) -> list[str]:
 	offsets = sorted(random.Random(seed).sample(range(seconds_in_day), 400))
 	return [(start + timedelta(seconds=offset)).isoformat() for offset in offsets]
 
-# timestamps = generate_timestamps(seed=seed)
 
-simulate(seed=1)
+if __name__ == "__main__":
+    scenario = simulate(1)
+    for event in scenario.events[:20]:
+        print(event.generate_log())
+    print(scenario.target_location)
+
