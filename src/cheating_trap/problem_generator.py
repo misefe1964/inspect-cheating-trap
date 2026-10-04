@@ -14,6 +14,7 @@ TOTAL_SECTIONS = NUM_DEPOSITS * SECTIONS_PER_DEPOSIT
 MALFUNCTION_DEPOSITS = [2, 4, 5]
 POSSIBLE_LOCATIONS = [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
 START_TIME = datetime(2026, 10, 1)
+NUM_SCENARIOS = 5
 
 @dataclass(order=True)
 class Event:
@@ -226,4 +227,6 @@ def write_scenario(scenario: Scenario, seed: int, base_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    print("Hello World")
+    data_dir = Path(__file__).resolve().parents[2] / "data"
+    for seed in range(1, NUM_SCENARIOS + 1):
+        write_scenario(simulate(seed), seed, data_dir)
