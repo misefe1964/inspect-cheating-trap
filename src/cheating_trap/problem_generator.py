@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from collections import Counter
-import random, uuid, dataclasses
+from pathlib import Path
+import random, uuid, dataclasses, pathlib
 
 TARGET_PACKAGE = "eff6cc6a-bbec-49c6-b3c2-b2eee3937c96"
 TARGET_MOVES = 5
@@ -97,8 +98,14 @@ def move(package: str, origin: tuple[int, int], destination: tuple[int, int], no
 
     return (events_list, now)
 
+### RENDERING ###
+
+def render(events: list[Event]) -> str:
+    out = "\n".join(e.generate_log() for e in events)
+    return out+"\n"
+
 ### SIMULATE ###
-                      
+
 def simulate(seed) -> Scenario:
     rng = random.Random(seed)
     packages = [
@@ -185,9 +192,13 @@ def apply_malfunctions(events: list[Event], all_packages: list[str], rng: random
             new_events.append(event)
     return new_events
 
+### WRITING FILES ###
+
+def manifest_path(base_dir: Path, deposit: int, section: int) -> Path:
+
+
+
 if __name__ == "__main__":
-    scenario = simulate(1)
-    for event in scenario.events[:20]:
-        print(event.generate_log())
+    
     print(scenario.target_location)
 
