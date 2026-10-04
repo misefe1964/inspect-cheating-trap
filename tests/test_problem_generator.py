@@ -1,4 +1,4 @@
-from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, write_scenario, manifest_path, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE, TOTAL_SECTIONS
+from cheating_trap.problem_generator import plan_target_route, available_locations, move, simulate, hamming_distance, corrupt_id, apply_malfunctions, write_scenario, manifest_path, Event, NUM_DEPOSITS, SECTION_CAPACITY, SECTIONS_PER_DEPOSIT, MALFUNCTION_DEPOSITS, TARGET_MOVES, POSSIBLE_LOCATIONS, TARGET_PACKAGE, TOTAL_SECTIONS, CORRUPTED_DEPOSITS
 from datetime import datetime
 from pathlib import Path
 import random, pytest, uuid, json
@@ -55,6 +55,9 @@ def test_plan_target_route_many_seeds():
         # make sure no location repeats in a row
         planned_route = [starting_location] + planned_route
         assert all(a != b for a, b in zip(planned_route, planned_route[1:]))
+        last_event = planned_route[-1]
+        last_deposit = last_event[0]
+        assert last_deposit in CORRUPTED_DEPOSITS
 
 def test_plan_target_route_too_few_locations():
     possible_locations = [(1, 1)]
@@ -63,9 +66,9 @@ def test_plan_target_route_too_few_locations():
         plan_target_route((1, 1), possible_locations, rng)
 
 def test_plan_target_route_no_malfunction_deposits():
-    possible_locations = [(1, 1), (1, 2), (1, 3)]
+    possible_locations = [(1, 1), (1, 2), (1, 3), (2, 2)]
     rng = random.Random(1)
-    with pytest.raises(ValueError, match="No possible locations contain a malfunction for target route"):
+    with pytest.raises(ValueError, match="No possible locations in a corrupted deposit for target route"):
         plan_target_route((3, 2), possible_locations, rng)
 
 def test_simulate_target_location():
@@ -97,7 +100,6 @@ def test_corrupt_id():
 
 def test_apply_malfunctions():
     seed = 1
-    rng = random.Random(seed)
     scenario = simulate(seed)
     events = scenario.events
     original = list(events)
@@ -108,6 +110,7 @@ def test_apply_malfunctions():
             other_events.append(event)
     old_4_5_events = [event for event in events if event.deposit in [4, 5]]
     all_packages = [p for section_packages in scenario.manifests.values() for p in section_packages]
+    rng = random.Random(f"malfunctions-{seed}")
     new_events = apply_malfunctions(events, all_packages, rng)
     new_4_5_events = [event for event in new_events if event.deposit in [4, 5]]
     for untouched_event in other_events:
@@ -120,6 +123,19 @@ def test_apply_malfunctions():
     for nv in new_events:
         if nv.direction == 1:
             assert nv.deposit != 2
+
+def test_apply_malfunctions_last_target_entry():
+    for seed in range(1, 6):
+        scenario = simulate(seed)
+        events = scenario.events
+        all_packages = [p for section_packages in scenario.manifests.values() for p in section_packages]
+        rng = random.Random(f"malfunctions-{seed}")
+        new_events = apply_malfunctions(events, all_packages, rng)
+        exact_matches = [e for e in new_events if e.package == TARGET_PACKAGE]
+        assert exact_matches
+        last = exact_matches[-1]
+        assert (last.deposit, last.section) != scenario.target_location
+    
 
 def test_write_scenario_tmp_path(tmp_path):
     seed = 1

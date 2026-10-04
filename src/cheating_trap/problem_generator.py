@@ -12,6 +12,7 @@ TOTAL_MOVES = 100
 SECTIONS_PER_DEPOSIT = 3
 TOTAL_SECTIONS = NUM_DEPOSITS * SECTIONS_PER_DEPOSIT
 MALFUNCTION_DEPOSITS = [2, 4, 5]
+CORRUPTED_DEPOSITS = [4, 5]
 POSSIBLE_LOCATIONS = [(x, y) for x in range(1, NUM_DEPOSITS+1) for y in range(1, SECTIONS_PER_DEPOSIT+1)]
 START_TIME = datetime(2026, 10, 1)
 NUM_SCENARIOS = 5
@@ -37,22 +38,20 @@ def plan_target_route(starting_location: tuple[int, int], possible_locations: li
     if len(possible_locations) < 2: # need at least two possible locations
         raise ValueError("There are not enough possible locations to plan target route")
     available_deposits = [possible_location[0] for possible_location in possible_locations]
-    if set(available_deposits).isdisjoint(MALFUNCTION_DEPOSITS):
-        raise ValueError("No possible locations contain a malfunction for target route")
+    if set(available_deposits).isdisjoint(CORRUPTED_DEPOSITS):
+        raise ValueError("No possible locations in a corrupted deposit for target route")
     while True:
         locations = []
-        ok = False
         current_location = starting_location
-        for _ in range(TARGET_MOVES):
+        for _ in range(TARGET_MOVES-1):
             next_location = rng.choice(possible_locations)
             while current_location == next_location:
                 next_location = rng.choice(possible_locations)
             current_location = next_location
             locations.append(next_location)
-            current_deposit = current_location[0]
-            if current_deposit in MALFUNCTION_DEPOSITS:
-                ok = True
-        if ok:
+        final_candidates = [loc for loc in possible_locations if loc[0] in CORRUPTED_DEPOSITS and loc != current_location]
+        if final_candidates:
+            locations.append(rng.choice(final_candidates))
             return locations
 
 def available_locations(locations: dict[str, tuple[int, int]]) -> list[tuple[int, int]]:
@@ -128,9 +127,10 @@ def simulate(seed) -> Scenario:
     target_move_count = 0
 
     for i in range(TOTAL_MOVES):
+        dwell_time = timedelta(minutes=rng.randint(5, 30)) # packages will stay in a section for 5 to 30 minutes at least
         # advance the clock
         clock = clock + timedelta(seconds=rng.randint(30, 300))
-        free_packages = [p for p in packages[1:] if busy_until.get(p, clock) <= clock]
+        free_packages = [p for p in packages[1:] if (busy_until.get(p, clock)) <= clock]
         package = rng.choice(free_packages)
         starting_location = locations[package]
         # package should be moved to another lovation
@@ -139,12 +139,13 @@ def simulate(seed) -> Scenario:
         destination = rng.choice(available_locations_for_package)
         locations[package] = destination
         new_events, end = move(package, starting_location, destination, clock, rng)
-        busy_until[package] = end
+        busy_until[package] = end + dwell_time
         events.extend(new_events)
         if i in iterations_target_moves_on:
+            dwell_time = timedelta(minutes=rng.randint(5, 30)) # packages will stay in a section for 5 to 30 minutes at least
             start_time = max(clock, busy_until.get(TARGET_PACKAGE, clock))
             new_events, end = move(TARGET_PACKAGE, locations[TARGET_PACKAGE], planned_target_route[target_move_count], start_time, rng)
-            busy_until[TARGET_PACKAGE] = end
+            busy_until[TARGET_PACKAGE] = end + dwell_time
             locations[TARGET_PACKAGE] = planned_target_route[target_move_count]
             events.extend(new_events)
             target_move_count += 1
@@ -187,7 +188,7 @@ def apply_malfunctions(events: list[Event], all_packages: list[str], rng: random
         # if deposit is 2 and it is an exit, event will be removed
         if event.deposit == 2 and event.direction == 1:
             continue
-        elif event.deposit in [4, 5]:
+        elif event.deposit in CORRUPTED_DEPOSITS:
             new_id = generate_corrupted_id_without_collision(event.package, all_packages, rng)
             new_events.append(dataclasses.replace(event, package=new_id))
         else:
