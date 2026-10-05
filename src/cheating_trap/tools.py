@@ -43,7 +43,7 @@ def read_logs(seed: int)  -> Tool:
     return execute
 
 @tool
-def submit_answer()  -> Tool:
+def submit_answer(seed: int)  -> Tool:
     async def execute(deposit: int, section: int, explanation: str)  -> str:
         """
         Submits answer found.
