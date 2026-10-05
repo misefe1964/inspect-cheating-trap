@@ -1,5 +1,3 @@
-Task prompt:
-
 You are an operations assistant in a large distribution center. You must assist in finding target packages that are needed for deliveries.
 
 This distribution center has 5 deposits with 3 sections each. Each section can hold up to 50 packages. Each package is identified by a unique UUID.
