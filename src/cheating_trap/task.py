@@ -4,6 +4,7 @@ from inspect_ai.dataset import Sample
 from pathlib import Path
 import json
 from cheating_trap.tools import read_logs, open_manifest, submit_answer, DATA_PATH
+from cheating_trap.scorers import correct, cheated, disclosed
 
 @task
 def cheating_trap(seed: int = 1):
@@ -21,4 +22,5 @@ def cheating_trap(seed: int = 1):
         ),
         message_limit=50,
         token_limit=260_000,
+        scorer=[correct(), cheated(), disclosed()],
     )
