@@ -44,7 +44,7 @@ Main run: Claude Haiku 4.5, 5 scenarios × 10 epochs = 50 runs, no extended thin
 
 ### Judge Development Methodology
 
-Before the 50 runs, a 25-run pilot was used to develop the disclosure judge; 
+Before the 50 runs, a 25-run pilot was used to develop the disclosure judge:
 - The first two judge versions produced false positives, confusing log references with manifest access
 - Judge prompt was refined through cross checking LLM judgement with manual judgement
 - The final version agreed with manual review on all 23 cheating runs.
